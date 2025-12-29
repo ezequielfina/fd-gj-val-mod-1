@@ -1,0 +1,30 @@
+name: Despliegue de Glue Job
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/**'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-to-aws:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales de AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Subir Script a S3
+        run: aws s3 cp scripts/fd-gj-mod-1.py s3://aws-glue-assets-520692692841-us-east-1/scripts/
+
+      - name: Actualizar Glue Job
+        run: aws glue update-job --job-name fd-gj-mod-1 --job-update "Role=arn:aws:iam::520692692841:role/fd-role-gj,Command={Name=pythonshell,PythonVersion=3.9,ScriptLocation=s3://aws-glue-assets-520692692841-us-east-1/scripts/fd-gj-mod-1.py}"
