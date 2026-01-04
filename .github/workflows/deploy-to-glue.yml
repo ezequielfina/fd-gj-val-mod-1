@@ -13,6 +13,9 @@ on:
 jobs:
   deploy-to-aws:
     runs-on: ubuntu-latest
+    env:
+      GLUE_JOB_NAME: fd-gj-mod-1
+      SCRIPT_BUCKET: aws-glue-assets-520692692841-us-east-1
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
@@ -24,8 +27,53 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Subir Script a S3
-        run: aws s3 cp scripts/fd-gj-mod-1.py s3://aws-glue-assets-520692692841-us-east-1/scripts/
+      # 1. Subir Script a ruta de TESTING
+      - name: Subir Script de Test a S3
+        run: aws s3 cp scripts/fd-gj-mod-1.py s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py
 
-      - name: Actualizar Glue Job
-        run: aws glue update-job --job-name fd-gj-mod-1 --job-update "Role=arn:aws:iam::520692692841:role/fd-role-gj,Command={Name=pythonshell,PythonVersion=3.9,ScriptLocation=s3://aws-glue-assets-520692692841-us-east-1/scripts/fd-gj-mod-1.py}"
+      # 2. Apuntar el Glue Job al script de TESTING
+      - name: Configurar Glue Job en modo Test
+        run: |
+          aws glue update-job \
+            --job-name ${{ env.GLUE_JOB_NAME }} \
+            --job-update "Command={Name=glueetl,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py,PythonVersion=3}"
+
+      # 3. Correr Glue Test Job (Nota: Asegurate que 'archivo_prueba' sea .xlsx si usas read_excel)
+      - name: Correr Glue Test Job
+        id: run-glue
+        run: |
+          RUN_ID=$(aws glue start-job-run --job-name ${{ env.GLUE_JOB_NAME }} --arguments='--file_key="s3://franq-bucket/testing-models/mod-1.xlsx"' --query 'JobRunId' --output text)
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+
+      # 4. Esperar resultados (Igual que tu script original)
+      - name: Wait for Test Result
+        run: |
+          while true; do
+            STATUS=$(aws glue get-job-run --job-name ${{ env.GLUE_JOB_NAME }} --run-id ${{ env.RUN_ID }} --query 'JobRun.JobRunState' --output text)
+            if [ "$STATUS" == "SUCCEEDED" ]; then
+              echo "✅ Test pasado con éxito"
+              break
+            elif [ "$STATUS" == "FAILED" ] || [ "$STATUS" == "STOPPED" ] || [ "$STATUS" == "TIMEOUT" ]; then
+              echo "❌ El test falló con estado: $STATUS"
+              # Importante: Mostrar logs de error si falla
+              aws glue get-job-run --job-name ${{ env.GLUE_JOB_NAME }} --run-id ${{ env.RUN_ID }} --query 'JobRun.ErrorMessage'
+              exit 1
+            fi
+            echo "Esperando a Glue... (Status: $STATUS)"
+            sleep 15
+          done
+
+      # 5. Promote to Production (Copiar archivo y Actualizar Job)
+      - name: Promote to Production
+        if: success()
+        run: |
+          echo "Promoviendo script..."
+          # A. Copiar el archivo físico a la carpeta de scripts productivos
+          aws s3 cp s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py s3://${{ env.SCRIPT_BUCKET }}/scripts/fd-gj-mod-1.py
+          
+          # B. Re-apuntar el Glue Job al script de PRODUCCIÓN
+          aws glue update-job \
+            --job-name ${{ env.GLUE_JOB_NAME }} \
+            --job-update "Command={Name=glueetl,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/scripts/fd-gj-mod-1.py,PythonVersion=3}"
+            
+          echo "🚀 Script promovido y Job actualizado a producción correctamente"
