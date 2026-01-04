@@ -34,13 +34,11 @@ jobs:
       # 2. Apuntar el Glue Job al script de TESTING
       - name: Configurar Glue Job en modo Test
         run: |
-          # 1. Obtenemos el ARN del Rol actual del Job
           ROLE_ARN=$(aws glue get-job --job-name ${{ env.GLUE_JOB_NAME }} --query 'Job.Role' --output text)
           
-          # 2. Actualizamos pasando el Rol recuperado
           aws glue update-job \
             --job-name ${{ env.GLUE_JOB_NAME }} \
-            --job-update "Role=$ROLE_ARN,Command={Name=glueetl,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py,PythonVersion=3}"
+            --job-update "Role=$ROLE_ARN,DefaultArguments={'--file_key':'s3://franq-bucket/raw/e8ae6d9c-29e4-4fe4-b505-b472b6ddc5a1/year=2025/month=06/091acf95-e0db-4927-b678-f1ca0b11f6dd.xlsx','--additional-python-modules':'awswrangler,openpyxl'},Command={Name=glueetl,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py,PythonVersion=3}"
 
       # 3. Correr Glue Test Job (Nota: Asegurate que 'archivo_prueba' sea .xlsx si usas read_excel)
       - name: Correr Glue Test Job
