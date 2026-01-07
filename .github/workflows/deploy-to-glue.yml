@@ -6,8 +6,6 @@ on:
     paths:
       - 'scripts/**'
       - '.github/workflows/**'
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -16,26 +14,31 @@ jobs:
     env:
       GLUE_JOB_NAME: fd-gj-mod-1
       SCRIPT_BUCKET: aws-glue-assets-520692692841-us-east-1
+
     steps:
-      - name: Checkout del repositorio
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configurar credenciales de AWS
+      - name: Configurar AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # 1. Subir Script a ruta de TESTING
-      - name: Subir Script de Test a S3
-        run: aws s3 cp scripts/fd-gj-mod-1.py s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py
-
-      # 2. Configurar Glue Job
-      - name: Configurar Glue Job en modo Test
+      # 1️⃣ Subir script de test
+      - name: Subir Script TEST
         run: |
-          ROLE_ARN=$(aws glue get-job --job-name ${{ env.GLUE_JOB_NAME }} --query 'Job.Role' --output text)
-          
+          aws s3 cp scripts/fd-gj-mod-1.py \
+          s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py
+
+      # 2️⃣ Configurar Glue Job
+      - name: Configurar Glue Job
+        run: |
+          ROLE_ARN=$(aws glue get-job \
+            --job-name ${{ env.GLUE_JOB_NAME }} \
+            --query 'Job.Role' --output text)
+
           aws glue update-job \
             --job-name ${{ env.GLUE_JOB_NAME }} \
             --job-update "{
@@ -46,55 +49,59 @@ jobs:
                 \"PythonVersion\": \"3.9\"
               },
               \"DefaultArguments\": {
-                \"--additional-python-modules\": \"aws-sdk-pandas==3.4.0,openpyxl==3.1.2\",
-                \"--BUCKET\": \"franq-bucket\",
-                \"--file_key\": \"raw/temp.xlsx\"
+                \"--additional-python-modules\": \"awswrangler==3.4.0,openpyxl==3.1.2\",
+                \"--BUCKET\": \"franq-bucket\"
               },
               \"MaxCapacity\": 0.0625
             }"
 
-      # 3. Correr Glue Test Job
-      - name: Correr Glue Test Job
-        id: run-glue
+      # 3️⃣ Ejecutar test
+      - name: Ejecutar Glue Test
         run: |
-          # Usamos comillas simples para el JSON y dobles para los keys/values
           RUN_ID=$(aws glue start-job-run \
             --job-name ${{ env.GLUE_JOB_NAME }} \
-            --arguments='{
-              "--file_key": "raw/e8ae6d9c-29e4-4fe4-b505-b472b6ddc5a1/year=2025/month=06/091acf95-e0db-4927-b678-f1ca0b11f6dd.xlsx",
-              "--additional-python-modules": "aws-sdk-pandas,openpyxl"
-            }' --query 'JobRunId' --output text)
+            --arguments '{
+              "--file_key": "raw/e8ae6d9c-29e4-4fe4-b505-b472b6ddc5a1/year=2025/month=06/test.xlsx"
+            }' \
+            --query 'JobRunId' --output text)
+
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
 
-      # 4. Esperar resultados (Igual que tu script original)
-      - name: Wait for Test Result
+      # 4️⃣ Esperar resultado
+      - name: Esperar resultado
         run: |
           while true; do
-            STATUS=$(aws glue get-job-run --job-name ${{ env.GLUE_JOB_NAME }} --run-id ${{ env.RUN_ID }} --query 'JobRun.JobRunState' --output text)
+            STATUS=$(aws glue get-job-run \
+              --job-name ${{ env.GLUE_JOB_NAME }} \
+              --run-id ${{ env.RUN_ID }} \
+              --query 'JobRun.JobRunState' --output text)
+
             if [ "$STATUS" == "SUCCEEDED" ]; then
-              echo "✅ Test pasado con éxito"
+              echo "✅ Test OK"
               break
-            elif [ "$STATUS" == "FAILED" ] || [ "$STATUS" == "STOPPED" ] || [ "$STATUS" == "TIMEOUT" ]; then
-              echo "❌ El test falló con estado: $STATUS"
-              # Importante: Mostrar logs de error si falla
-              aws glue get-job-run --job-name ${{ env.GLUE_JOB_NAME }} --run-id ${{ env.RUN_ID }} --query 'JobRun.ErrorMessage'
+            elif [ "$STATUS" == "FAILED" ] || [ "$STATUS" == "STOPPED" ]; then
+              echo "❌ Glue falló"
+              aws glue get-job-run \
+                --job-name ${{ env.GLUE_JOB_NAME }} \
+                --run-id ${{ env.RUN_ID }} \
+                --query 'JobRun.ErrorMessage'
               exit 1
             fi
-            echo "Esperando a Glue... (Status: $STATUS)"
+
+            echo "⏳ Esperando... ($STATUS)"
             sleep 15
           done
 
-      # 5. Promote to Production (Copiar archivo y Actualizar Job)
-      - name: Promote to Production
+      # 5️⃣ Promote
+      - name: Promote to PROD
         if: success()
         run: |
-          echo "Promoviendo script..."
-          # A. Copiar el archivo físico a la carpeta de scripts productivos
-          aws s3 cp s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py s3://${{ env.SCRIPT_BUCKET }}/scripts/fd-gj-mod-1.py
-          
-          # B. Re-apuntar el Glue Job al script de PRODUCCIÓN
+          aws s3 cp \
+            s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py \
+            s3://${{ env.SCRIPT_BUCKET }}/scripts/fd-gj-mod-1.py
+
           aws glue update-job \
             --job-name ${{ env.GLUE_JOB_NAME }} \
             --job-update "Command={Name=pythonshell,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/scripts/fd-gj-mod-1.py,PythonVersion=3}"
-            
-          echo "🚀 Script promovido y Job actualizado a producción correctamente"
+
+          echo "🚀 Producción actualizada"
