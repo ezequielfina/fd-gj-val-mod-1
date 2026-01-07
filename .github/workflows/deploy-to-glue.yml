@@ -61,7 +61,7 @@ jobs:
           RUN_ID=$(aws glue start-job-run \
             --job-name ${{ env.GLUE_JOB_NAME }} \
             --arguments '{
-              "--file_key": "raw/e8ae6d9c-29e4-4fe4-b505-b472b6ddc5a1/year=2025/month=06/test.xlsx"
+              "--file_key": "raw/e8ae6d9c-29e4-4fe4-b505-b472b6ddc5a1/year=2025/month=06/091acf95-e0db-4927-b678-f1ca0b11f6dd.xlsx"
             }' \
             --query 'JobRunId' --output text)
 
