@@ -144,7 +144,7 @@ else:
     from awsglue.utils import getResolvedOptions
 
     # 1. Recuperar parámetros
-    args = getResolvedOptions(sys.argv, ['file_key'])
+    args = getResolvedOptions(sys.argv, ['file_key', 'BUCKET'])
     # OJO: Asegurate que este bucket sea el correcto o pásalo como argumento también
     bucket = "franq-bucket"
     file_key = args['file_key']

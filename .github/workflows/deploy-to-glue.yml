@@ -38,18 +38,18 @@ jobs:
           
           aws glue update-job \
             --job-name ${{ env.GLUE_JOB_NAME }} \
-            --job-update "Role=$ROLE_ARN,DefaultArguments={--file_key=raw/e8ae6d9c-29e4-4fe4-b505-b472b6ddc5a1/year=2025/month=06/091acf95-e0db-4927-b678-f1ca0b11f6dd.xlsx,--additional-python-modules='awswrangler,openpyxl'},Command={Name=pythonshell,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py,PythonVersion=3}"
+            --job-update "Role=$ROLE_ARN,DefaultArguments={--file_key='raw/temp.xlsx',--additional-python-modules='aws-sdk-pandas,openpyxl',--BUCKET='franq-bucket'},Command={Name=pythonshell,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py,PythonVersion=3.9}"
 
-      # 3. Correr Glue Test Job (Nota: Asegurate que 'archivo_prueba' sea .xlsx si usas read_excel)
+      # 3. Correr Glue Test Job
       - name: Correr Glue Test Job
         id: run-glue
         run: |
+          # Usamos comillas simples para el JSON y dobles para los keys/values
           RUN_ID=$(aws glue start-job-run \
             --job-name ${{ env.GLUE_JOB_NAME }} \
             --arguments='{
               "--file_key": "raw/e8ae6d9c-29e4-4fe4-b505-b472b6ddc5a1/year=2025/month=06/091acf95-e0db-4927-b678-f1ca0b11f6dd.xlsx",
-              "--additional-python-modules": "aws-sdk-pandas,openpyxl",
-              "--BUCKET": "franq-bucket"
+              "--additional-python-modules": "aws-sdk-pandas,openpyxl"
             }' --query 'JobRunId' --output text)
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
 
