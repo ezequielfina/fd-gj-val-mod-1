@@ -49,8 +49,8 @@ def validar_main(metadata, df, bucket, file_key):
 
 
 if __name__ == "__main__":
-    args = getResolvedOptions(sys.argv, ["file_key", "BUCKET"])
-    bucket = args["BUCKET"]
+    args = getResolvedOptions(sys.argv, ["file_key"])
+    bucket = "franq-data"
     file_key = args["file_key"]
 
     path = f"s3://{bucket}/{file_key}"
