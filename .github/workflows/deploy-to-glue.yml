@@ -11,14 +11,19 @@ on:
 jobs:
   deploy-to-aws:
     runs-on: ubuntu-latest
+
     env:
       GLUE_JOB_NAME: fd-gj-mod-1
       SCRIPT_BUCKET: aws-glue-assets-520692692841-us-east-1
+      PROD_SCRIPT_KEY: scripts/fd-gj-mod-1.py
+      TEST_SCRIPT_KEY: testing/test-version.py
 
     steps:
+      # 1️⃣ Checkout
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 2️⃣ AWS credentials
       - name: Configurar AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -26,36 +31,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # 1️⃣ Subir script de test
+      # 3️⃣ Subir script de TEST
       - name: Subir Script TEST
         run: |
           aws s3 cp scripts/fd-gj-mod-1.py \
-          s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py
+            s3://${{ env.SCRIPT_BUCKET }}/${{ env.TEST_SCRIPT_KEY }}
 
-      # 2️⃣ Configurar Glue Job
-      - name: Configurar Glue Job
-        run: |
-          ROLE_ARN=$(aws glue get-job \
-            --job-name ${{ env.GLUE_JOB_NAME }} \
-            --query 'Job.Role' --output text)
-
-          aws glue update-job \
-            --job-name ${{ env.GLUE_JOB_NAME }} \
-            --job-update "{
-              \"Role\": \"$ROLE_ARN\",
-              \"Command\": {
-                \"Name\": \"pythonshell\",
-                \"ScriptLocation\": \"s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py\",
-                \"PythonVersion\": \"3.9\"
-              },
-              \"DefaultArguments\": {
-                \"--additional-python-modules\": \"awswrangler==3.4.0,openpyxl==3.1.2\",
-                \"--BUCKET\": \"franq-bucket\"
-              },
-              \"MaxCapacity\": 0.0625
-            }"
-
-      # 3️⃣ Ejecutar test
+      # 4️⃣ Ejecutar Glue Job (TEST)
       - name: Ejecutar Glue Test
         run: |
           RUN_ID=$(aws glue start-job-run \
@@ -67,8 +49,8 @@ jobs:
 
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
 
-      # 4️⃣ Esperar resultado
-      - name: Esperar resultado
+      # 5️⃣ Esperar resultado del TEST
+      - name: Esperar resultado del Test
         run: |
           while true; do
             STATUS=$(aws glue get-job-run \
@@ -76,11 +58,11 @@ jobs:
               --run-id ${{ env.RUN_ID }} \
               --query 'JobRun.JobRunState' --output text)
 
-            if [ "$STATUS" == "SUCCEEDED" ]; then
+            if [ "$STATUS" = "SUCCEEDED" ]; then
               echo "✅ Test OK"
               break
-            elif [ "$STATUS" == "FAILED" ] || [ "$STATUS" == "STOPPED" ]; then
-              echo "❌ Glue falló"
+            elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "STOPPED" ] || [ "$STATUS" = "TIMEOUT" ]; then
+              echo "❌ Test falló con estado: $STATUS"
               aws glue get-job-run \
                 --job-name ${{ env.GLUE_JOB_NAME }} \
                 --run-id ${{ env.RUN_ID }} \
@@ -88,20 +70,23 @@ jobs:
               exit 1
             fi
 
-            echo "⏳ Esperando... ($STATUS)"
+            echo "⏳ Esperando Glue... ($STATUS)"
             sleep 15
           done
 
-      # 5️⃣ Promote
-      - name: Promote to PROD
+      # 6️⃣ Backup + Promote a PROD
+      - name: Promote a Producción
         if: success()
         run: |
+          echo "📦 Backup del script actual (si existe)..."
           aws s3 cp \
-            s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py \
-            s3://${{ env.SCRIPT_BUCKET }}/scripts/fd-gj-mod-1.py
+            s3://${{ env.SCRIPT_BUCKET }}/${{ env.PROD_SCRIPT_KEY }} \
+            s3://${{ env.SCRIPT_BUCKET }}/scripts/backup/fd-gj-mod-1-prev.py \
+            || echo "No existe versión previa, continúo"
 
-          aws glue update-job \
-            --job-name ${{ env.GLUE_JOB_NAME }} \
-            --job-update "Command={Name=pythonshell,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/scripts/fd-gj-mod-1.py,PythonVersion=3}"
+          echo "🚀 Promoviendo script a PROD..."
+          aws s3 cp \
+            s3://${{ env.SCRIPT_BUCKET }}/${{ env.TEST_SCRIPT_KEY }} \
+            s3://${{ env.SCRIPT_BUCKET }}/${{ env.PROD_SCRIPT_KEY }}
 
-          echo "🚀 Producción actualizada"
+          echo "✅ Producción actualizada correctamente"
