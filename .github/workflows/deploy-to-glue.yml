@@ -38,7 +38,7 @@ jobs:
           
           aws glue update-job \
             --job-name ${{ env.GLUE_JOB_NAME }} \
-            --job-update "Role=$ROLE_ARN,DefaultArguments={--file_key=raw/e8ae6d9c-29e4-4fe4-b505-b472b6ddc5a1/year=2025/month=06/091acf95-e0db-4927-b678-f1ca0b11f6dd.xlsx,--additional-python-modules='awswrangler,openpyxl'},Command={Name=glueetl,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py,PythonVersion=3}"
+            --job-update "Role=$ROLE_ARN,DefaultArguments={--file_key=raw/e8ae6d9c-29e4-4fe4-b505-b472b6ddc5a1/year=2025/month=06/091acf95-e0db-4927-b678-f1ca0b11f6dd.xlsx,--additional-python-modules='awswrangler,openpyxl'},Command={Name=pythonshell,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py,PythonVersion=3}"
 
       # 3. Correr Glue Test Job (Nota: Asegurate que 'archivo_prueba' sea .xlsx si usas read_excel)
       - name: Correr Glue Test Job
@@ -76,6 +76,6 @@ jobs:
           # B. Re-apuntar el Glue Job al script de PRODUCCIÓN
           aws glue update-job \
             --job-name ${{ env.GLUE_JOB_NAME }} \
-            --job-update "Command={Name=glueetl,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/scripts/fd-gj-mod-1.py,PythonVersion=3}"
+            --job-update "Command={Name=pythonshell,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/scripts/fd-gj-mod-1.py,PythonVersion=3}"
             
           echo "🚀 Script promovido y Job actualizado a producción correctamente"

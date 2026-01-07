@@ -1,3 +1,8 @@
+import sys
+import boto3
+import os
+import io
+from dotenv import load_dotenv
 import pandas as pd
 import awswrangler as wr
 import datetime
@@ -110,10 +115,6 @@ def validar_main(metadata_periodo: str, df: pd.DataFrame, file_key: str) -> bool
 
 
 if __name__ == '__main__':
-    import boto3
-    import os
-    import io
-    from dotenv import load_dotenv
 
     load_dotenv()
 
@@ -141,7 +142,6 @@ if __name__ == '__main__':
     ))
 
 else:
-    import sys
     from awsglue.utils import getResolvedOptions
 
     # 1. Recuperar parámetros
