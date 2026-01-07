@@ -137,7 +137,7 @@ if __name__ == '__main__':
     print(validar_main(
         metadata_periodo=metadata_periodo[index_metadata_periodo],
         df=df,
-        file_key='raw/661eba39-9909-438f-8640-79e73d93fea1/year=2025/month=04/635dabf5-ddcc-4900-ade1-9d0b8a269304.xlsx'
+        file_key=os.getenv('FILE_KEY')
     ))
 
 else:

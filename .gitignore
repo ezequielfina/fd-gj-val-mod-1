@@ -1,2 +1,8 @@
 .idea
+.idea/
+
 .env
+
+.venv
+
+fd_gj_val_mod_1.egg-info

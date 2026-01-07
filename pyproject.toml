@@ -1,0 +1,23 @@
+[project]
+name = "fd-gj-val-mod-1"
+version = "0.1.0"
+description = "Validación y modelado de datos"
+# AQUÍ defines la versión de Python como requisito obligatorio
+requires-python = "==3.12.10"
+
+# Aquí van tus dependencias del requirements.txt
+dependencies = [
+    "pandas>=2.1.0",
+    "awswrangler>=3.14.0",
+    "boto3>=1.42.16",
+    "python-dotenv>=1.0.1",
+    "openpyxl>=3.1.5"
+]
+
+[project.optional-dependencies]
+# Aquí metes los stubs para desarrollo (lo que hablábamos antes)
+dev = [
+    "pandas-stubs",
+    "boto3-stubs[essential]",
+    "mypy",
+]
