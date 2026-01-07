@@ -2,7 +2,6 @@ import sys
 import boto3
 import os
 import io
-from dotenv import load_dotenv
 import pandas as pd
 import awswrangler as wr
 import datetime
@@ -115,7 +114,7 @@ def validar_main(metadata_periodo: str, df: pd.DataFrame, file_key: str) -> bool
 
 
 if __name__ == '__main__':
-
+    from dotenv import load_dotenv
     load_dotenv()
 
     client: boto3.client = boto3.client('s3',
