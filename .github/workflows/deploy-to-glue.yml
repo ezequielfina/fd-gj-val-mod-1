@@ -39,18 +39,32 @@ jobs:
           aws s3 cp scripts/fd-gj-mod-1.py \
             s3://${{ env.SCRIPT_BUCKET }}/${{ env.TEST_SCRIPT_KEY }}
 
-      # 4️⃣ Ejecutar el Job apuntando al script de TEST (Override)
-      # Aquí forzamos a Glue a usar el script nuevo y a instalar las librerías
-      - name: Ejecutar Glue Test
+      # 4️⃣ Configurar y Ejecutar Test
+      - name: Configurar y Ejecutar Test
         id: run-glue
         run: |
+          # A. Obtenemos el Role para no perderlo
+          ROLE_ARN=$(aws glue get-job --job-name ${{ env.GLUE_JOB_NAME }} --query 'Job.Role' --output text)
+
+          # B. Forzamos al Job a apuntar al archivo de TESTING y configuramos librerías
+          aws glue update-job \
+            --job-name ${{ env.GLUE_JOB_NAME }} \
+            --job-update "{
+              \"Role\": \"$ROLE_ARN\",
+              \"Command\": {
+                \"Name\": \"pythonshell\",
+                \"ScriptLocation\": \"s3://${{ env.SCRIPT_BUCKET }}/${{ env.TEST_SCRIPT_KEY }}\",
+                \"PythonVersion\": \"3.9\"
+              },
+              \"DefaultArguments\": {
+                \"--additional-python-modules\": \"aws-sdk-pandas==3.4.0,openpyxl==3.1.2\"
+              }
+            }"
+
+          # C. Ahora sí, arrancamos la ejecución enviando solo el file_key
           RUN_ID=$(aws glue start-job-run \
             --job-name ${{ env.GLUE_JOB_NAME }} \
-            --command '{"Name": "pythonshell", "ScriptLocation": "s3://${{ env.SCRIPT_BUCKET }}/${{ env.TEST_SCRIPT_KEY }}", "PythonVersion": "3.9"}' \
-            --arguments '{
-              "--file_key": "raw/e8ae6d9c-29e4-4fe4-b505-b472b6ddc5a1/year=2025/month=06/091acf95-e0db-4927-b678-f1ca0b11f6dd.xlsx",
-              "--additional-python-modules": "aws-sdk-pandas==3.4.0,openpyxl==3.1.2"
-            }' \
+            --arguments '{"--file_key": "raw/e8ae6d9c-29e4-4fe4-b505-b472b6ddc5a1/year=2025/month=06/091acf95-e0db-4927-b678-f1ca0b11f6dd.xlsx"}' \
             --query 'JobRunId' --output text)
 
           echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
@@ -78,23 +92,16 @@ jobs:
             sleep 20
           done
 
-      # 6️⃣ Si el test pasó: Backup de la versión anterior y Promoción a PROD
-      - name: Promoción a Producción
+      # 6️⃣ Backup + Promote a PROD
+      - name: Promote a Producción
         if: success()
         run: |
-          echo "📦 Generando backup de la versión anterior en S3..."
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          aws s3 cp \
-            s3://${{ env.SCRIPT_BUCKET }}/${{ env.PROD_SCRIPT_KEY }} \
-            s3://${{ env.SCRIPT_BUCKET }}/scripts/backups/fd-gj-mod-1-$TIMESTAMP.py || echo "No había versión previa."
-
-          echo "🚀 Copiando script validado a la ruta de producción..."
+          echo "🚀 Promoviendo script a PROD..."
           aws s3 cp \
             s3://${{ env.SCRIPT_BUCKET }}/${{ env.TEST_SCRIPT_KEY }} \
             s3://${{ env.SCRIPT_BUCKET }}/${{ env.PROD_SCRIPT_KEY }}
 
-          echo "⚙️ Actualizando configuración permanente del Glue Job..."
-          # Obtenemos el Role ARN actual para no perderlo al actualizar
+          echo "⚙️ Re-configurando Job para usar ruta de Producción..."
           ROLE_ARN=$(aws glue get-job --job-name ${{ env.GLUE_JOB_NAME }} --query 'Job.Role' --output text)
           
           aws glue update-job \
@@ -108,8 +115,6 @@ jobs:
               },
               \"DefaultArguments\": {
                 \"--additional-python-modules\": \"aws-sdk-pandas==3.4.0,openpyxl==3.1.2\"
-              },
-              \"MaxCapacity\": 0.0625
+              }
             }"
-
-          echo "✅ Producción actualizada y configurada correctamente."
+          echo "✅ Producción actualizada correctamente"
