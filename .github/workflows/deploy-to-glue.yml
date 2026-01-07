@@ -31,14 +31,27 @@ jobs:
       - name: Subir Script de Test a S3
         run: aws s3 cp scripts/fd-gj-mod-1.py s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py
 
-      # 2. Apuntar el Glue Job al script de TESTING
+      # 2. Configurar Glue Job
       - name: Configurar Glue Job en modo Test
         run: |
           ROLE_ARN=$(aws glue get-job --job-name ${{ env.GLUE_JOB_NAME }} --query 'Job.Role' --output text)
           
           aws glue update-job \
             --job-name ${{ env.GLUE_JOB_NAME }} \
-            --job-update "Role=$ROLE_ARN,DefaultArguments={--file_key='raw/temp.xlsx',--additional-python-modules='aws-sdk-pandas,openpyxl',--BUCKET='franq-bucket'},Command={Name=pythonshell,ScriptLocation=s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py,PythonVersion=3.9}"
+            --job-update "{
+              \"Role\": \"$ROLE_ARN\",
+              \"Command\": {
+                \"Name\": \"pythonshell\",
+                \"ScriptLocation\": \"s3://${{ env.SCRIPT_BUCKET }}/testing/test-version.py\",
+                \"PythonVersion\": \"3.9\"
+              },
+              \"DefaultArguments\": {
+                \"--additional-python-modules\": \"aws-sdk-pandas==3.4.0,openpyxl==3.1.2\",
+                \"--BUCKET\": \"franq-bucket\",
+                \"--file_key\": \"raw/temp.xlsx\"
+              },
+              \"MaxCapacity\": 0.0625
+            }"
 
       # 3. Correr Glue Test Job
       - name: Correr Glue Test Job
