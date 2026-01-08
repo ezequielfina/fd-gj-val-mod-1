@@ -4,8 +4,9 @@ on:
   push:
     branches: [main]
     paths:
-      - 'scripts/fd-gj-mod-1.py'
+      - '../../scripts/script.py'
       - '.github/workflows/**'
+      - 'pyproject.toml'
   workflow_dispatch:
 
 jobs:
@@ -15,7 +16,7 @@ jobs:
     env:
       GLUE_JOB_NAME: fd-gj-mod-1
       SCRIPT_BUCKET: aws-glue-assets-520692692841-us-east-1
-      PROD_SCRIPT_KEY: scripts/fd-gj-mod-1.py
+      PROD_SCRIPT_KEY: scripts/script.py
       TEST_SCRIPT_KEY: testing/test-version.py
       # Bucket de datos para las pruebas
       DATA_BUCKET: franq-bucket
@@ -36,7 +37,7 @@ jobs:
       # 3️⃣ Subir el nuevo script a la ruta de TESTING
       - name: Subir Script a S3 (Testing)
         run: |
-          aws s3 cp scripts/fd-gj-mod-1.py \
+          aws s3 cp scripts/script.py \
             s3://${{ env.SCRIPT_BUCKET }}/${{ env.TEST_SCRIPT_KEY }}
 
       # 4️⃣ Configurar y Ejecutar Test
