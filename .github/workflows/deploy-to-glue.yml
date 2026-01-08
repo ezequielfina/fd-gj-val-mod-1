@@ -59,7 +59,7 @@ jobs:
               },
               \"DefaultArguments\": {
                 \"--library-set\": \"analytics\",
-                \"--additional-python-modules\": \"openpyxl==3.1.2\"
+                \"--additional-python-modules\": \"openpyxl==3.0.9\"
               }
             }"
 
@@ -117,7 +117,7 @@ jobs:
               },
               \"DefaultArguments\": {
                 \"--library-set\": \"analytics\",
-                \"--additional-python-modules\": \"openpyxl==3.1.2\"
+                \"--additional-python-modules\": \"openpyxl==3.0.9\"
               }
             }"
           echo "✅ Producción actualizada correctamente"
