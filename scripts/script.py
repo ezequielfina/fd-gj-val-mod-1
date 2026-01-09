@@ -1,9 +1,8 @@
+from typing import Optional
 import sys
 import pandas as pd
 import awswrangler as wr
-import datetime
 import logging
-import calendar
 
 # --- CONFIGURACIÓN DE LOGS ---
 logger = logging.getLogger(__name__)
@@ -19,7 +18,7 @@ logging.basicConfig(
 BUCKET_NAME = "franq-bucket"
 
 
-def obtener_index_metadata_periodo(col: pd.Series) -> int | None:
+def obtener_index_metadata_periodo(col: pd.Series) -> Optional[int]:
     # El logger ya sabe que función es por la config de arriba
     for i, v in enumerate(col):
         if str(v).startswith("Mercado"):
@@ -27,14 +26,14 @@ def obtener_index_metadata_periodo(col: pd.Series) -> int | None:
     return None
 
 
-def obtener_header(col: pd.Series) -> int | None:
+def obtener_header(col: pd.Series) -> Optional[int]:
     for i, v in enumerate(col):
         if str(v).startswith("Número"):
             return i
     return None
 
 
-def validar_metadata_periodo(metadata: any, file_key: str) -> bool:
+def validar_metadata_periodo(metadata: str, file_key: str) -> bool:
     """
     Valida período vs nombre del archivo.
     Maneja casos donde la metadata llega como NaN (float) o vacía.
